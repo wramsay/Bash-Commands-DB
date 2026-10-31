@@ -1,0 +1,10 @@
+# Local import sources; distribute the populated SQLite database instead.
+*.[jJ][sS][oO][nN]
+*.jsonl
+__pycache__/
+*.py[cod]
+.venv/
+.DS_Store
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
