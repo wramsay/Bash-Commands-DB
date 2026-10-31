@@ -35,6 +35,41 @@ Commands are unique by case-sensitive text with outer whitespace removed. Duplic
 
 The initial database is populated from `developer_command_archive.json` and `linux_troubleshooting_bash_commands.json`. Future agent imports follow [AGENTS.md](AGENTS.md) and process only the source explicitly named by the user.
 
+## Database schema and reference format
+
+`commands.sqlite3` contains one table, `commands`, with no foreign keys or separate metadata tables:
+
+| Column | SQLite definition | Content |
+| --- | --- | --- |
+| `id` | `INTEGER PRIMARY KEY` | Stable, database-generated entry ID |
+| `command` | `TEXT NOT NULL UNIQUE` | Case-sensitive command text, or a reference-entry title |
+| `description` | `TEXT NOT NULL` | Purpose |
+| `category` | `TEXT NOT NULL` | Browsing category, such as Git, GitHub, or Filesystem |
+| `platforms` | `TEXT NOT NULL` | JSON-encoded list of platform strings; `[]` when unspecified |
+| `notes` | `TEXT NOT NULL` | Usage notes; enriched entries include `Syntax:` and `Example:` lines |
+| `risk` | `TEXT NOT NULL` | Informational label such as `normal` or `review`; empty when unspecified |
+| `used_for` | `TEXT NOT NULL` | Practical purpose or workflow context |
+| `caution` | `TEXT NOT NULL` | Relevant limitations and cautions |
+
+The unique constraint creates SQLite's automatic index on `command` using the default case-sensitive BINARY collation. The importer trims outer whitespace before matching; internal whitespace, quoting, and case remain significant. There are no column defaults: the importer supplies empty strings for omitted text metadata and `[]` for omitted platforms. Syntax and examples use existing fields so the Python application needs no schema migration. Reference entries are explicitly marked as prose, not executable commands.
+
+The Git, GitHub CLI, and file-management update adds 8 entries and enriches 18 existing entries, bringing the catalog to 115. Existing IDs, command strings, and unrelated records are preserved. Importing still skips existing commands; metadata enrichment is a separate, explicitly requested database edit.
+
+## Parallel terminals and SSH collaboration
+
+Multiple terminals or SSH sessions on the same computer can use the same repository folder. Saved file changes are immediately shared; reconnecting or pulling is unnecessary for edits in that folder. Unsaved editor buffers are not shared. Changes pushed from another computer require pulling to update the checkout. Separate clones, even on one computer, need synchronization.
+
+Different-file edits can coexist, but the working tree and staging area are shared. `git add .` may stage everyone's changes. Stage specific paths, review `git diff --cached`, and coordinate commits, pulls, and branch switches. The database includes a searchable “Parallel terminals and SSH collaboration” reference entry.
+
+Troubleshooting:
+
+- A regular folder needs `git init` or a proper `git clone` before remote commands work.
+- A commit is local until pushed; `git log -1` alone does not prove it reached GitHub.
+- Do not copy nested `.git` directories into a parent repository. The catalog's `rsync` command excludes `.git` at every depth. Its trailing source slash copies contents; matching files can be overwritten, while destination-only files remain. See the [rsync manual](https://download.samba.org/pub/rsync/rsync.1).
+- `~` does not expand inside quotes; use `"$HOME/path"` for quoted home-directory paths.
+- Replace placeholder URLs with actual URLs, omitting literal `<` and `>` characters.
+- Repository creation with `gh repo create NAME --private --source=. --remote=origin --push` needs an initialized local repository and commits to push. Review existing remotes first. See the [GitHub CLI manual](https://cli.github.com/manual/gh_repo_create).
+
 ## Version control
 
 Commit `bashdb.py`, `commands.sqlite3`, `README.md`, `AGENTS.md`, `.gitignore`, and `tests/`. JSON sources are ignored at every directory level. Clones receive the populated database and can use the program immediately. The database contents are shared with anyone who receives the repository.
