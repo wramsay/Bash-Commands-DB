@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Browse and import a SQLite command reference using only Python's standard library."""
 import argparse
+from contextlib import closing
+from difflib import SequenceMatcher
 import json
 from pathlib import Path
 import sqlite3
@@ -46,6 +48,105 @@ def connect(db):
     return conn
 
 
+def similar_commands(conn, command, category):
+    """Compare literal character sequences within a category and its descendants."""
+    matches = []
+    for row in search(conn, category=category):
+        # Average both directions so the score is independent of argument order.
+        score = sum(SequenceMatcher(None, a, b, autojunk=False).ratio()
+                    for a, b in ((command, row['command']), (row['command'], command))) / 2
+        if score >= 0.70:
+            matches.append((score, row))
+    return sorted(matches, key=lambda match: (-match[0], match[1]['id']))
+
+
+class SimilarCommandsError(ValueError):
+    def __init__(self, matches):
+        super().__init__('Similar commands need confirmation.')
+        self.matches = matches
+
+
+def add_command(db, record, approved_ids=()):
+    """Save one entry, checking duplicates and similarity atomically.
+
+    Return None for an exact duplicate. Only explicitly approved matches may
+    be bypassed, so another session's new entries are checked on retry.
+    """
+    command = record['command'].strip()
+    category = record['category'].strip()
+    if not command or not category:
+        raise ValueError('Command and category must not be empty.')
+    with closing(sqlite3.connect(db)) as conn, conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute('BEGIN IMMEDIATE')
+        if conn.execute('SELECT id FROM commands WHERE command = ?', (command,)).fetchone():
+            return None
+        matches = [(score, row) for score, row in similar_commands(conn, command, category)
+                   if row['id'] not in approved_ids]
+        if matches:
+            raise SimilarCommandsError(matches)
+        values = [json.dumps(record.get(f, [])) if f == 'platforms'
+                  else category if f == 'category' else record.get(f, '') for f in FIELDS]
+        return conn.execute('''INSERT INTO commands
+            (command, description, category, platforms, notes, risk, used_for, caution)
+            VALUES (?,?,?,?,?,?,?,?)''', [command, *values]).lastrowid
+
+
+def enter_command(conn, db):
+    """Collect an entry without writing until all prompts are complete."""
+    try:
+        categories = [name for name, count in category_counts(conn) if name]
+        for i, category in enumerate(categories, 1):
+            print(f'{i}. {category}')
+        selected = input('Category number, or new for a new category (blank cancels): ').strip()
+        if not selected:
+            return
+        if selected.lower() == 'new':
+            category = input('New category name (use / with surrounding spaces for levels): ').strip()
+        elif selected.isdigit() and 1 <= int(selected) <= len(categories):
+            category = categories[int(selected) - 1]
+        else:
+            print('Invalid category.')
+            return
+        if not category:
+            print('Cancelled.')
+            return
+        command = input('Command (blank cancels): ').strip()
+        if not command:
+            print('Cancelled.')
+            return
+        if conn.execute('SELECT id FROM commands WHERE command = ?', (command,)).fetchone():
+            print('Skipped: exact command already exists; existing details preserved.')
+            return
+        record = {'command': command, 'category': category}
+        print('Optional details: press Enter to leave a field empty. Ctrl-C cancels.')
+        for field in FIELDS:
+            if field == 'category':
+                continue
+            label = 'Platforms (comma-separated)' if field == 'platforms' else field.replace('_', ' ').capitalize()
+            value = input(f'{label}: ')
+            record[field] = [part.strip() for part in value.split(',') if part.strip()] if field == 'platforms' else value
+        approved_ids = set()
+        while True:
+            try:
+                ident = add_command(db, record, approved_ids)
+                print(f'Added command #{ident} in {category}.' if ident is not None
+                      else 'Skipped: exact command already exists; existing details preserved.')
+                return
+            except SimilarCommandsError as exc:
+                print('Commands with at least 70% similar format in this category (including subcategories):')
+                for score, row in exc.matches:
+                    print(f"  {score:.1%}  #{row['id']} [{row['category']}] {row['command']}")
+                if input('Save this command anyway? [y/N]: ').strip().lower() not in ('y', 'yes'):
+                    print('Cancelled; nothing saved.')
+                    return
+                approved_ids.update(row['id'] for score, row in exc.matches)
+    except (EOFError, KeyboardInterrupt):
+        print('\nCancelled; nothing saved.')
+    except (OSError, ValueError, sqlite3.Error) as exc:
+        print(f'Could not add command: {exc}')
+
+
 def search(conn, query='', category=''):
     return conn.execute('''SELECT * FROM commands WHERE
         (? = '' OR instr(lower(command || ' ' || description || ' ' || category || ' ' || notes || ' ' || used_for || ' ' || caution || ' ' || platforms), lower(?)) > 0)
@@ -82,12 +183,14 @@ def detail(conn, ident):
             print(f'{field.replace("_", " ").capitalize()}: {value}')
 
 
-def browse(conn):
+def browse(conn, db=None):
+    if db is None:
+        db = conn.execute('PRAGMA database_list').fetchone()[2]
     rows, page = search(conn), 0
     while True:
         print(f'\nPage {page + 1}/{max(1, (len(rows) + 14) // 15)}')
         listing(rows[page * 15:(page + 1) * 15])
-        print('n next | p previous | s search | c category | a all | ID details | q quit')
+        print('n next | p previous | s search | c category | a all | add command | ID details | q quit')
         try:
             choice = input('> ').strip()
             if choice == 'q':
@@ -108,6 +211,9 @@ def browse(conn):
                 else:
                     print('Invalid category.')
             elif choice == 'a':
+                rows, page = search(conn), 0
+            elif choice == 'add':
+                enter_command(conn, db)
                 rows, page = search(conn), 0
             elif choice.isdigit():
                 detail(conn, int(choice))
@@ -137,7 +243,7 @@ def main():
             added, skipped = import_file(args.db, args.file)
             print(f'Imported {added}; skipped {skipped} duplicate(s).')
             return 0
-        with connect(args.db) as conn:
+        with closing(connect(args.db)) as conn:
             if args.action == 'search':
                 listing(search(conn, args.query, args.category))
             elif args.action == 'show':
@@ -146,7 +252,7 @@ def main():
                 for row in category_counts(conn):
                     print(f'{row[0]} ({row[1]})')
             else:
-                browse(conn)
+                browse(conn, args.db)
         return 0
     except (OSError, ValueError, sqlite3.Error) as exc:
         print(f'Error: {exc}', file=sys.stderr)

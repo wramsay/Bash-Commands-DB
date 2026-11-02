@@ -10,7 +10,7 @@ From this directory:
 python3 bashdb.py
 ```
 
-Use `n`/`p` for pages, `s` to search, `c` to select a category, `a` for all commands, a command ID to read details, or `q` to quit. Commands are displayed as reference text; the application never executes them. Descriptions and cautions come from the supplied archives and are not independently verified.
+Use `n`/`p` for pages, `s` to search, `c` to select a category, `a` for all commands, `add` to enter a command, a command ID to read details, or `q` to quit. Commands are displayed as reference text; the application never executes them. Descriptions and cautions come from the supplied archives and are not independently verified.
 
 You can also query directly:
 
@@ -22,6 +22,14 @@ python3 bashdb.py show 1
 ```
 
 Search matches literal text in commands and metadata, case-insensitively for ASCII. Categories use ` / ` to separate levels: selecting a parent includes its descendants. The category list includes parents with aggregate counts. Browsing opens SQLite read-only. The default database is located beside `bashdb.py`, even when launched from another directory. Use `--db PATH` before a subcommand to select another database.
+
+## Add commands while browsing
+
+Type `add` at the main prompt. Select an existing category by number, or enter `new` and type a category name. New categories appear when their first command is saved; use names such as `Tools / Networking` for subcategories. Enter the command and optional description, platforms (comma-separated), notes, risk, purpose, and caution. Blank category selection or command cancels; Ctrl-C during entry also cancels.
+
+Before saving, the program checks commands in the chosen category and its descendants. Matches with a format similarity of **70% or higher** are shown with their IDs, commands, and percentages. Enter `y` or `yes` to save anyway; any other answer cancels. Similarity measures matching character sequences using Python's `SequenceMatcher` with its automatic junk heuristic disabled, averaging the scores in both directions. It is case-sensitive and includes spaces, quotes, and flags; it measures text structure, not shell meaning.
+
+Exact duplicates are skipped across the entire database, preserving existing details. Only outer command whitespace is trimmed. Saving uses a separate, short-lived writable connection to the selected database; the browser connection remains read-only. After entry, the browser refreshes to the first page of all commands. Nothing is executed, and no JSON source is required.
 
 ## Import a selected JSON file
 
@@ -124,4 +132,4 @@ Ignore rules do not remove files already tracked by Git or erase prior history. 
 python3 -m unittest discover -s tests
 ```
 
-Tests cover duplicate handling, preservation of existing metadata and shell whitespace, input validation, search, database integrity, and read-only browsing.
+Tests cover duplicate handling, preservation of existing metadata and shell whitespace, input validation, search, database integrity, read-only browsing, interactive entry and cancellation, category creation, and similarity warnings at the 70% threshold.
