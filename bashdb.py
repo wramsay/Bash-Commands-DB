@@ -49,7 +49,19 @@ def connect(db):
 def search(conn, query='', category=''):
     return conn.execute('''SELECT * FROM commands WHERE
         (? = '' OR instr(lower(command || ' ' || description || ' ' || category || ' ' || notes || ' ' || used_for || ' ' || caution || ' ' || platforms), lower(?)) > 0)
-        AND (? = '' OR category = ?) ORDER BY category, command''', (query, query, category, category)).fetchall()
+        AND (? = '' OR category = ? OR substr(category, 1, length(?) + 3) = ? || ' / ')
+        ORDER BY category, command''', (query, query, category, category, category, category)).fetchall()
+
+
+def category_counts(conn):
+    """Include parent categories, with counts covering their descendants."""
+    counts = {}
+    for category, count in conn.execute('SELECT category, count(*) FROM commands GROUP BY category'):
+        parts = category.split(' / ')
+        for depth in range(1, len(parts) + 1):
+            parent = ' / '.join(parts[:depth])
+            counts[parent] = counts.get(parent, 0) + count
+    return sorted(counts.items())
 
 
 def listing(rows):
@@ -87,7 +99,7 @@ def browse(conn):
             elif choice == 's':
                 rows, page = search(conn, input('Search: ')), 0
             elif choice == 'c':
-                categories = [r[0] for r in conn.execute('SELECT DISTINCT category FROM commands ORDER BY category')]
+                categories = [name for name, count in category_counts(conn)]
                 for i, category in enumerate(categories, 1):
                     print(f'{i}. {category}')
                 selected = input('Category number: ')
@@ -131,7 +143,7 @@ def main():
             elif args.action == 'show':
                 detail(conn, args.id)
             elif args.action == 'categories':
-                for row in conn.execute('SELECT category, count(*) FROM commands GROUP BY category ORDER BY category'):
+                for row in category_counts(conn):
                     print(f'{row[0]} ({row[1]})')
             else:
                 browse(conn)

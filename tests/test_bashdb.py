@@ -7,6 +7,28 @@ import bashdb
 
 
 class ImportTests(unittest.TestCase):
+    def test_category_hierarchy(self):
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / 'input.json'
+            db = Path(folder) / 'test.sqlite3'
+            source.write_text(json.dumps([
+                {'command': str(i), 'category': category}
+                for i, category in enumerate([
+                    'Neovim', 'Neovim / Android', 'Neovim / Python',
+                    'Neovim / Python / Tools', 'Neovim extras', 'Other',
+                    'Literal_% / Child'])]))
+            bashdb.import_file(db, source)
+            with bashdb.connect(db) as conn:
+                self.assertEqual(len(bashdb.search(conn, category='Neovim')), 4)
+                self.assertEqual(len(bashdb.search(conn, category='Neovim / Python')), 2)
+                self.assertEqual(len(bashdb.search(conn, '3', 'Neovim')), 1)
+                self.assertEqual(len(bashdb.search(conn, category='Literal_%')), 1)
+                self.assertEqual(len(bashdb.search(conn, category='Literal')), 0)
+                counts = dict(bashdb.category_counts(conn))
+                self.assertEqual(counts['Neovim'], 4)
+                self.assertEqual(counts['Neovim / Python'], 2)
+                self.assertEqual(counts['Other'], 1)
+
     def test_duplicates_validation_and_readonly(self):
         with tempfile.TemporaryDirectory() as folder:
             source = Path(folder) / 'input.json'

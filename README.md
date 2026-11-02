@@ -21,7 +21,7 @@ python3 bashdb.py categories
 python3 bashdb.py show 1
 ```
 
-Search matches literal text in commands and metadata, case-insensitively for ASCII. Browsing opens SQLite read-only. The default database is located beside `bashdb.py`, even when launched from another directory. Use `--db PATH` before a subcommand to select another database.
+Search matches literal text in commands and metadata, case-insensitively for ASCII. Categories use ` / ` to separate levels: selecting a parent includes its descendants. The category list includes parents with aggregate counts. Browsing opens SQLite read-only. The default database is located beside `bashdb.py`, even when launched from another directory. Use `--db PATH` before a subcommand to select another database.
 
 ## Import a selected JSON file
 
@@ -69,7 +69,25 @@ In the interactive browser, press `c` and select either category. Open an entry 
 - **Python:** create `hello.py`, run it with `python3 hello.py`, and manage dependencies in a virtual environment. `python3 -m py_compile hello.py` checks syntax and generates bytecode, not a standalone native executable.
 - **C++:** create `main.cpp`, compile with `c++ -std=c++17 -Wall -Wextra -g main.cpp -o hello`, then run `./hello`. Entries also cover Clang, G++, multiple source files, separate compilation/linking, and existing Makefiles.
 
-Source-creation examples overwrite the named file. Compiler commands replace their named output. These entries are reference text; browsing never executes them. The catalog now contains 143 entries.
+Source-creation examples overwrite the named file. Compiler commands replace their named output. These entries are reference text; browsing never executes them. That update brought the catalog to 143 entries.
+
+## Neovim, including Android development
+
+The `Neovim` category contains 63 entries across Android, Basics, Editing, Search, Files and windows, Configuration, Terminal, GitHub, Python, C++, Language tooling, and Troubleshooting. The catalog now contains 206 entries.
+
+```sh
+python3 bashdb.py search --category Neovim
+python3 bashdb.py search --category 'Neovim / Android'
+python3 bashdb.py search --category 'Neovim / GitHub'
+python3 bashdb.py search --category 'Neovim / Python'
+python3 bashdb.py search --category 'Neovim / C++'
+```
+
+In the browser, press `c` and select `Neovim` for everything or a subcategory for one topic. Entries identify shell commands, Neovim command-line input, Normal-mode keys, and prose references. Android instructions use Termux, with projects in its home directory and Python/Clang installed through `pkg`.
+
+Twenty reference entries point to existing commands by ID rather than duplicating them or changing their original descriptions. Open the referenced ID in the browser or use `python3 bashdb.py show ID`. For example, the Neovim Python section refers to command #120 for `python3 hello.py`; the C++ section refers to #136 for Clang compilation and #138 for running the result. Save editor buffers before running or compiling.
+
+The new material follows the [Neovim documentation](https://neovim.io/doc/user/), [Neovim installation guide](https://neovim.io/doc/install/), and [GitHub CLI editor configuration](https://cli.github.com/manual/gh_config_set). Relevant entries include source links. Language-server setup is an overview; installed versions and Android-compatible tools determine the configuration needed.
 
 ## Parallel terminals and SSH collaboration
 
