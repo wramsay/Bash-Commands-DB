@@ -55,6 +55,22 @@ The unique constraint creates SQLite's automatic index on `command` using the de
 
 The Git, GitHub CLI, and file-management update adds 8 entries and enriches 18 existing entries, bringing the catalog to 115. Existing IDs, command strings, and unrelated records are preserved. Importing still skips existing commands; metadata enrichment is a separate, explicitly requested database edit.
 
+## Python and C++ development on macOS and Linux
+
+The `Python` and `C++` categories contain 28 entries covering tool installation, creating and editing source files, running programs, and compilation. Platform-specific installation entries identify macOS or Debian/Ubuntu Linux; other Linux distributions need their corresponding package manager.
+
+```sh
+python3 bashdb.py search --category Python
+python3 bashdb.py search --category 'C++'
+```
+
+In the interactive browser, press `c` and select either category. Open an entry by ID for usage notes and cautions.
+
+- **Python:** create `hello.py`, run it with `python3 hello.py`, and manage dependencies in a virtual environment. `python3 -m py_compile hello.py` checks syntax and generates bytecode, not a standalone native executable.
+- **C++:** create `main.cpp`, compile with `c++ -std=c++17 -Wall -Wextra -g main.cpp -o hello`, then run `./hello`. Entries also cover Clang, G++, multiple source files, separate compilation/linking, and existing Makefiles.
+
+Source-creation examples overwrite the named file. Compiler commands replace their named output. These entries are reference text; browsing never executes them. The catalog now contains 143 entries.
+
 ## Parallel terminals and SSH collaboration
 
 Multiple terminals or SSH sessions on the same computer can use the same repository folder. Saved file changes are immediately shared; reconnecting or pulling is unnecessary for edits in that folder. Unsaved editor buffers are not shared. Changes pushed from another computer require pulling to update the checkout. Separate clones, even on one computer, need synchronization.
